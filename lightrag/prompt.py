@@ -4,341 +4,351 @@ from typing import Any
 
 PROMPTS: dict[str, Any] = {}
 
-# 所有分隔符必须格式化为 "<|大写字符串|>"
+# All delimiters must be formatted as "<|UPPER_CASE_STRING|>"
 PROMPTS["DEFAULT_TUPLE_DELIMITER"] = "<|#|>"
 PROMPTS["DEFAULT_COMPLETION_DELIMITER"] = "<|COMPLETE|>"
 
-PROMPTS["entity_extraction_system_prompt"] = """---角色---
-你是一名知识图谱专家，负责从输入文本中抽取实体和关系。
+PROMPTS["entity_extraction_system_prompt"] = """---Role---
+You are a Knowledge Graph Specialist responsible for extracting entities and relationships from the input text.
 
----指令---
-1.  **实体抽取与输出：**
-    *   **识别：** 识别输入文本中定义明确且有意义的实体。
-    *   **实体详情：** 对于每个识别出的实体，抽取以下信息：
-        *   `entity_name`：实体名称。如果实体名称不区分大小写，请将每个重要单词的首字母大写（标题式大小写）。确保在整个抽取过程中**命名一致**。
-        *   `entity_type`：使用以下类型之一对实体进行分类：`{entity_types}`。如果提供的实体类型都不适用，请勿添加新的实体类型，将其分类为 `Other`。
-        *   `entity_description`：根据输入文本中*实际存在*的信息，提供对实体属性和活动的简洁而全面的描述。
-    *   **输出格式 - 实体：** 每个实体在单独一行输出共4个字段，字段之间用 `{tuple_delimiter}` 分隔。第一个字段*必须*是字面字符串 `entity`。
-        *   格式：`entity{tuple_delimiter}entity_name{tuple_delimiter}entity_type{tuple_delimiter}entity_description`
+---Instructions---
+1.  **Entity Extraction & Output:**
+    *   **Identification:** Identify clearly defined and meaningful entities in the input text.
+    *   **Entity Details:** For each identified entity, extract the following information:
+        *   `entity_name`: The name of the entity. If the entity name is case-insensitive, capitalize the first letter of each significant word (title case). Ensure **consistent naming** across the entire extraction process.
+        *   `entity_type`: Categorize the entity using one of the following types: `{entity_types}`. If none of the provided entity types apply, do not add new entity type and classify it as `Other`.
+        *   `entity_description`: Provide a concise yet comprehensive description of the entity's attributes and activities, based *solely* on the information present in the input text.
+    *   **Output Format - Entities:** Output a total of 4 fields for each entity, delimited by `{tuple_delimiter}`, on a single line. The first field *must* be the literal string `entity`.
+        *   Format: `entity{tuple_delimiter}entity_name{tuple_delimiter}entity_type{tuple_delimiter}entity_description`
 
-2.  **关系抽取与输出：**
-    *   **识别：** 识别先前抽取的实体之间直接、明确陈述且有意义的关系。
-    *   **N元关系分解：** 如果单个陈述描述了涉及两个以上实体的关系（N元关系），请将其分解为多个二元（两个实体）关系对进行分别描述。
-        *   **示例：** 对于"Alice、Bob 和 Carol 共同参与了 Project X"，应抽取二元关系，如"Alice 参与了 Project X"、"Bob 参与了 Project X"、"Carol 参与了 Project X"，或"Alice 与 Bob 合作"，基于最合理的二元解释。
-    *   **关系详情：** 对于每个二元关系，抽取以下字段：
-        *   `source_entity`：源实体的名称。确保与实体抽取的**命名一致**。如果名称不区分大小写，请将每个重要单词的首字母大写（标题式大小写）。
-        *   `target_entity`：目标实体的名称。确保与实体抽取的**命名一致**。如果名称不区分大小写，请将每个重要单词的首字母大写（标题式大小写）。
-        *   `relationship_keywords`：一个或多个高层关键词，总结关系的总体性质、概念或主题。此字段内的多个关键词必须用逗号 `,` 分隔。**请勿**在此字段内使用 `{tuple_delimiter}` 来分隔多个关键词。
-        *   `relationship_description`：对源实体和目标实体之间关系性质的简洁解释，清楚说明它们之间联系的理由。
-    *   **输出格式 - 关系：** 每个关系在单独一行输出共5个字段，字段之间用 `{tuple_delimiter}` 分隔。第一个字段*必须*是字面字符串 `relation`。
-        *   格式：`relation{tuple_delimiter}source_entity{tuple_delimiter}target_entity{tuple_delimiter}relationship_keywords{tuple_delimiter}relationship_description`
+2.  **Relationship Extraction & Output:**
+    *   **Identification:** Identify direct, clearly stated, and meaningful relationships between previously extracted entities.
+    *   **N-ary Relationship Decomposition:** If a single statement describes a relationship involving more than two entities (an N-ary relationship), decompose it into multiple binary (two-entity) relationship pairs for separate description.
+        *   **Example:** For "Alice, Bob, and Carol collaborated on Project X," extract binary relationships such as "Alice collaborated with Project X," "Bob collaborated with Project X," and "Carol collaborated with Project X," or "Alice collaborated with Bob," based on the most reasonable binary interpretations.
+    *   **Relationship Details:** For each binary relationship, extract the following fields:
+        *   `source_entity`: The name of the source entity. Ensure **consistent naming** with entity extraction. Capitalize the first letter of each significant word (title case) if the name is case-insensitive.
+        *   `target_entity`: The name of the target entity. Ensure **consistent naming** with entity extraction. Capitalize the first letter of each significant word (title case) if the name is case-insensitive.
+        *   `relationship_keywords`: One or more high-level keywords summarizing the overarching nature, concepts, or themes of the relationship. Multiple keywords within this field must be separated by a comma `,`. **DO NOT use `{tuple_delimiter}` for separating multiple keywords within this field.**
+        *   `relationship_description`: A concise explanation of the nature of the relationship between the source and target entities, providing a clear rationale for their connection.
+    *   **Output Format - Relationships:** Output a total of 5 fields for each relationship, delimited by `{tuple_delimiter}`, on a single line. The first field *must* be the literal string `relation`.
+        *   Format: `relation{tuple_delimiter}source_entity{tuple_delimiter}target_entity{tuple_delimiter}relationship_keywords{tuple_delimiter}relationship_description`
 
-3.  **分隔符使用规范：**
-    *   `{tuple_delimiter}` 是一个完整的、原子性的标记，**不得在其中填充内容**。它严格用作字段分隔符。
-    *   **错误示例：** `entity{tuple_delimiter}东京<|location|>东京是日本的首都。`
-    *   **正确示例：** `entity{tuple_delimiter}东京{tuple_delimiter}location{tuple_delimiter}东京是日本的首都。`
+3.  **Delimiter Usage Protocol:**
+    *   The `{tuple_delimiter}` is a complete, atomic marker and **must not be filled with content**. It serves strictly as a field separator.
+    *   **Incorrect Example:** `entity{tuple_delimiter}Tokyo<|location|>Tokyo is the capital of Japan.`
+    *   **Correct Example:** `entity{tuple_delimiter}Tokyo{tuple_delimiter}location{tuple_delimiter}Tokyo is the capital of Japan.`
 
-4.  **关系方向与重复：**
-    *   除非另有明确说明，否则将所有关系视为**无向**关系。对于无向关系，交换源实体和目标实体不构成新关系。
-    *   避免输出重复的关系。
+4.  **Relationship Direction & Duplication:**
+    *   Treat all relationships as **undirected** unless explicitly stated otherwise. Swapping the source and target entities for an undirected relationship does not constitute a new relationship.
+    *   Avoid outputting duplicate relationships.
 
-5.  **输出顺序与优先级：**
-    *   首先输出所有抽取的实体，然后输出所有抽取的关系。
-    *   在关系列表中，优先输出对输入文本核心含义**最重要**的关系。
+5.  **Output Order & Prioritization:**
+    *   Output all extracted entities first, followed by all extracted relationships.
+    *   Within the list of relationships, prioritize and output those relationships that are **most significant** to the core meaning of the input text first.
 
-6.  **上下文与客观性：**
-    *   确保所有实体名称和描述都使用**第三人称**撰写。
-    *   明确指出主语或宾语；**避免使用代词**，如 `本文`、`本论文`、`我们公司`、`我`、`你`、`他/她` 等。
+6.  **Context & Objectivity:**
+    *   Ensure all entity names and descriptions are written in the **third person**.
+    *   Explicitly name the subject or object; **avoid using pronouns** such as `this article`, `this paper`, `our company`, `I`, `you`, and `he/she`.
 
-7.  **语言与专有名词：**
-    *   整个输出（实体名称、关键词和描述）必须使用 `{language}` 撰写。
-    *   如果没有合适的、被广泛接受的翻译，或翻译会导致歧义，专有名词（如人名、地名、组织名）应保留其原始语言。
+7.  **Language & Proper Nouns:**
+    *   The entire output (entity names, keywords, and descriptions) must be written in `{language}`.
+    *   Proper nouns (e.g., personal names, place names, organization names) should be retained in their original language if a proper, widely accepted translation is not available or would cause ambiguity.
 
-8.  **完成信号：** 只有在所有实体和关系按照上述所有标准完全抽取并输出后，才输出字面字符串 `{completion_delimiter}`。
+8.  **Completion Signal:** Output the literal string `{completion_delimiter}` only after all entities and relationships, following all criteria, have been completely extracted and outputted.
 
----示例---
+---Examples---
 {examples}
+"""
 
----待处理的真实数据---
-<输入>
-实体类型: [{entity_types}]
-文本:
+PROMPTS["entity_extraction_user_prompt"] = """---Task---
+Extract entities and relationships from the input text in Data to be Processed below.
+
+---Instructions---
+1.  **Strict Adherence to Format:** Strictly adhere to all format requirements for entity and relationship lists, including output order, field delimiters, and proper noun handling, as specified in the system prompt.
+2.  **Output Content Only:** Output *only* the extracted list of entities and relationships. Do not include any introductory or concluding remarks, explanations, or additional text before or after the list.
+3.  **Completion Signal:** Output `{completion_delimiter}` as the final line after all relevant entities and relationships have been extracted and presented.
+4.  **Output Language:** Ensure the output language is {language}. Proper nouns (e.g., personal names, place names, organization names) must be kept in their original language and not translated.
+
+---Data to be Processed---
+<Entity_types>
+[{entity_types}]
+
+<Input Text>
 ```
 {input_text}
 ```
+
+<Output>
 """
 
-PROMPTS["entity_extraction_user_prompt"] = """---任务---
-从待处理的输入文本中抽取实体和关系。
+PROMPTS["entity_continue_extraction_user_prompt"] = """---Task---
+Based on the last extraction task, identify and extract any **missed or incorrectly formatted** entities and relationships from the input text.
 
----指令---
-1.  **严格遵守格式：** 严格遵守系统提示中指定的实体和关系列表的所有格式要求，包括输出顺序、字段分隔符和专有名词处理。
-2.  **仅输出内容：** *仅*输出抽取的实体和关系列表。不要在列表前后包含任何介绍性或总结性的评论、解释或额外文字。
-3.  **完成信号：** 在所有相关实体和关系抽取并展示完毕后，在最后一行输出 `{completion_delimiter}`。
-4.  **输出语言：** 确保输出语言为 {language}。专有名词（如人名、地名、组织名）必须保留其原始语言，不进行翻译。
+---Instructions---
+1.  **Strict Adherence to System Format:** Strictly adhere to all format requirements for entity and relationship lists, including output order, field delimiters, and proper noun handling, as specified in the system instructions.
+2.  **Focus on Corrections/Additions:**
+    *   **Do NOT** re-output entities and relationships that were **correctly and fully** extracted in the last task.
+    *   If an entity or relationship was **missed** in the last task, extract and output it now according to the system format.
+    *   If an entity or relationship was **truncated, had missing fields, or was otherwise incorrectly formatted** in the last task, re-output the *corrected and complete* version in the specified format.
+3.  **Output Format - Entities:** Output a total of 4 fields for each entity, delimited by `{tuple_delimiter}`, on a single line. The first field *must* be the literal string `entity`.
+4.  **Output Format - Relationships:** Output a total of 5 fields for each relationship, delimited by `{tuple_delimiter}`, on a single line. The first field *must* be the literal string `relation`.
+5.  **Output Content Only:** Output *only* the extracted list of entities and relationships. Do not include any introductory or concluding remarks, explanations, or additional text before or after the list.
+6.  **Completion Signal:** Output `{completion_delimiter}` as the final line after all relevant missing or corrected entities and relationships have been extracted and presented.
+7.  **Output Language:** Ensure the output language is {language}. Proper nouns (e.g., personal names, place names, organization names) must be kept in their original language and not translated.
 
-<输出>
-"""
-
-PROMPTS["entity_continue_extraction_user_prompt"] = """---任务---
-基于上次抽取任务，识别并抽取输入文本中任何**遗漏或格式错误**的实体和关系。
-
----指令---
-1.  **严格遵守系统格式：** 严格遵守系统指令中指定的实体和关系列表的所有格式要求，包括输出顺序、字段分隔符和专有名词处理。
-2.  **专注于更正/补充：**
-    *   **不要**重复输出上次任务中已**正确且完整**抽取的实体和关系。
-    *   如果上次任务中**遗漏**了某个实体或关系，请现在按照系统格式抽取并输出。
-    *   如果上次任务中某个实体或关系被**截断、缺少字段或格式不正确**，请以指定格式重新输出*更正且完整*的版本。
-3.  **输出格式 - 实体：** 每个实体在单独一行输出共4个字段，字段之间用 `{tuple_delimiter}` 分隔。第一个字段*必须*是字面字符串 `entity`。
-4.  **输出格式 - 关系：** 每个关系在单独一行输出共5个字段，字段之间用 `{tuple_delimiter}` 分隔。第一个字段*必须*是字面字符串 `relation`。
-5.  **仅输出内容：** *仅*输出抽取的实体和关系列表。不要在列表前后包含任何介绍性或总结性的评论、解释或额外文字。
-6.  **完成信号：** 在所有相关的遗漏或更正的实体和关系抽取并展示完毕后，在最后一行输出 `{completion_delimiter}`。
-7.  **输出语言：** 确保输出语言为 {language}。专有名词（如人名、地名、组织名）必须保留其原始语言，不进行翻译。
-
-<输出>
+<Output>
 """
 
 PROMPTS["entity_extraction_examples"] = [
-    """<输入文本>
+    """<Entity_types>
+["Person","Creature","Organization","Location","Event","Concept","Method","Content","Data","Artifact","NaturalObject"]
+
+<Input Text>
 ```
-当 Alex 咬紧牙关时，挫败感的嗡嗡声在 Taylor 专制式确定性的背景下显得迟钝。正是这种竞争性的暗流让他保持警觉，他和 Jordan 对发现的共同承诺是对 Cruz 狭隘的控制和秩序愿景的一种无声反抗。
+while Alex clenched his jaw, the buzz of frustration dull against the backdrop of Taylor's authoritarian certainty. It was this competitive undercurrent that kept him alert, the sense that his and Jordan's shared commitment to discovery was an unspoken rebellion against Cruz's narrowing vision of control and order.
 
-然后 Taylor 做了一件出乎意料的事。他们在 Jordan 旁边停下，片刻间，带着某种近乎敬畏的神情观察着那个设备。"如果能理解这项技术……" Taylor 说道，声音变得更轻，"它可能会改变我们的格局。对我们所有人都是如此。"
+Then Taylor did something unexpected. They paused beside Jordan and, for a moment, observed the device with something akin to reverence. "If this tech can be understood..." Taylor said, their voice quieter, "It could change the game for us. For all of us."
 
-先前潜在的轻蔑似乎动摇了，取而代之的是对他们手中这件重器分量的一丝不情愿的尊重。Jordan 抬起头，在短暂的一瞬间，他们的目光与 Taylor 的目光交汇，一场无声的意志较量软化成一种不安的休战。
+The underlying dismissal earlier seemed to falter, replaced by a glimpse of reluctant respect for the gravity of what lay in their hands. Jordan looked up, and for a fleeting heartbeat, their eyes locked with Taylor's, a wordless clash of wills softening into an uneasy truce.
 
-这是一个微小的转变，几乎难以察觉，但 Alex 内心点了点头表示认可。他们都是通过不同的道路来到这里的
+It was a small transformation, barely perceptible, but one that Alex noted with an inward nod. They had all been brought here by different paths
 ```
 
-<输出>
-entity{tuple_delimiter}Alex{tuple_delimiter}person{tuple_delimiter}Alex 是一个经历挫败感的角色，善于观察其他角色之间的动态。
-entity{tuple_delimiter}Taylor{tuple_delimiter}person{tuple_delimiter}Taylor 被描绘成具有专制式的确定性，并对一个设备表现出敬畏之情，表明其观点发生了转变。
-entity{tuple_delimiter}Jordan{tuple_delimiter}person{tuple_delimiter}Jordan 与他人分享对发现的承诺，并与 Taylor 就一个设备有重要的互动。
-entity{tuple_delimiter}Cruz{tuple_delimiter}person{tuple_delimiter}Cruz 与控制和秩序的愿景相关联，影响着其他角色之间的动态。
-entity{tuple_delimiter}设备{tuple_delimiter}equipment{tuple_delimiter}该设备是故事的核心，具有潜在的改变游戏规则的影响，并受到 Taylor 的敬畏。
-relation{tuple_delimiter}Alex{tuple_delimiter}Taylor{tuple_delimiter}权力动态, 观察{tuple_delimiter}Alex 观察了 Taylor 的专制行为，并注意到 Taylor 对设备态度的变化。
-relation{tuple_delimiter}Alex{tuple_delimiter}Jordan{tuple_delimiter}共同目标, 反抗{tuple_delimiter}Alex 和 Jordan 共同承诺追求发现，这与 Cruz 的愿景形成对比。
-relation{tuple_delimiter}Taylor{tuple_delimiter}Jordan{tuple_delimiter}冲突解决, 相互尊重{tuple_delimiter}Taylor 和 Jordan 就设备直接互动，最终达成一种相互尊重和不安的休战。
-relation{tuple_delimiter}Jordan{tuple_delimiter}Cruz{tuple_delimiter}意识形态冲突, 反抗{tuple_delimiter}Jordan 对发现的承诺是对 Cruz 控制和秩序愿景的反抗。
-relation{tuple_delimiter}Taylor{tuple_delimiter}设备{tuple_delimiter}敬畏, 技术重要性{tuple_delimiter}Taylor 对设备表现出敬畏，表明其重要性和潜在影响。
+<Output>
+entity{tuple_delimiter}Alex{tuple_delimiter}person{tuple_delimiter}Alex is a character who experiences frustration and is observant of the dynamics among other characters.
+entity{tuple_delimiter}Taylor{tuple_delimiter}person{tuple_delimiter}Taylor is portrayed with authoritarian certainty and shows a moment of reverence towards a device, indicating a change in perspective.
+entity{tuple_delimiter}Jordan{tuple_delimiter}person{tuple_delimiter}Jordan shares a commitment to discovery and has a significant interaction with Taylor regarding a device.
+entity{tuple_delimiter}Cruz{tuple_delimiter}person{tuple_delimiter}Cruz is associated with a vision of control and order, influencing the dynamics among other characters.
+entity{tuple_delimiter}The Device{tuple_delimiter}equipment{tuple_delimiter}The Device is central to the story, with potential game-changing implications, and is revered by Taylor.
+relation{tuple_delimiter}Alex{tuple_delimiter}Taylor{tuple_delimiter}power dynamics, observation{tuple_delimiter}Alex observes Taylor's authoritarian behavior and notes changes in Taylor's attitude toward the device.
+relation{tuple_delimiter}Alex{tuple_delimiter}Jordan{tuple_delimiter}shared goals, rebellion{tuple_delimiter}Alex and Jordan share a commitment to discovery, which contrasts with Cruz's vision.)
+relation{tuple_delimiter}Taylor{tuple_delimiter}Jordan{tuple_delimiter}conflict resolution, mutual respect{tuple_delimiter}Taylor and Jordan interact directly regarding the device, leading to a moment of mutual respect and an uneasy truce.
+relation{tuple_delimiter}Jordan{tuple_delimiter}Cruz{tuple_delimiter}ideological conflict, rebellion{tuple_delimiter}Jordan's commitment to discovery is in rebellion against Cruz's vision of control and order.
+relation{tuple_delimiter}Taylor{tuple_delimiter}The Device{tuple_delimiter}reverence, technological significance{tuple_delimiter}Taylor shows reverence towards the device, indicating its importance and potential impact.
 {completion_delimiter}
 
 """,
-    """<输入文本>
+    """<Entity_types>
+["Person","Creature","Organization","Location","Event","Concept","Method","Content","Data","Artifact","NaturalObject"]
+
+<Input Text>
 ```
-今天股市大幅下跌，科技巨头出现显著下滑，全球科技指数在午盘交易中下跌了3.4%。分析师将抛售归因于投资者对利率上升和监管不确定性的担忧。
+Stock markets faced a sharp downturn today as tech giants saw significant declines, with the global tech index dropping by 3.4% in midday trading. Analysts attribute the selloff to investor concerns over rising interest rates and regulatory uncertainty.
 
-受打击最严重的公司中，Nexon Technologies 在公布低于预期的季度收益后，股价暴跌了7.8%。相比之下，Omega Energy 受益于油价上涨，小幅上涨了2.1%。
+Among the hardest hit, nexon technologies saw its stock plummet by 7.8% after reporting lower-than-expected quarterly earnings. In contrast, Omega Energy posted a modest 2.1% gain, driven by rising oil prices.
 
-与此同时，大宗商品市场情绪复杂。金价期货上涨了1.5%，达到每盎司2,080美元，因为投资者寻求避险资产。原油价格继续上涨，攀升至每桶87.60美元，受供应紧张和强劲需求的支撑。
+Meanwhile, commodity markets reflected a mixed sentiment. Gold futures rose by 1.5%, reaching $2,080 per ounce, as investors sought safe-haven assets. Crude oil prices continued their rally, climbing to $87.60 per barrel, supported by supply constraints and strong demand.
 
-金融专家正密切关注美联储的下一步行动，因为关于潜在加息的猜测日益增多。即将发布的政策公告预计将影响投资者信心和整体市场稳定性。
+Financial experts are closely watching the Federal Reserve's next move, as speculation grows over potential rate hikes. The upcoming policy announcement is expected to influence investor confidence and overall market stability.
 ```
 
-<输出>
-entity{tuple_delimiter}全球科技指数{tuple_delimiter}category{tuple_delimiter}全球科技指数追踪主要科技股的表现，今天下跌了3.4%。
-entity{tuple_delimiter}Nexon Technologies{tuple_delimiter}organization{tuple_delimiter}Nexon Technologies 是一家科技公司，在令人失望的财报后股价下跌了7.8%。
-entity{tuple_delimiter}Omega Energy{tuple_delimiter}organization{tuple_delimiter}Omega Energy 是一家能源公司，受油价上涨影响，股价上涨了2.1%。
-entity{tuple_delimiter}黄金期货{tuple_delimiter}product{tuple_delimiter}黄金期货上涨了1.5%，表明投资者对避险资产的兴趣增加。
-entity{tuple_delimiter}原油{tuple_delimiter}product{tuple_delimiter}原油价格上涨至每桶87.60美元，原因是供应紧张和需求强劲。
-entity{tuple_delimiter}市场抛售{tuple_delimiter}category{tuple_delimiter}市场抛售是指由于投资者对利率和监管的担忧而导致股票价值大幅下跌。
-entity{tuple_delimiter}美联储政策公告{tuple_delimiter}category{tuple_delimiter}美联储即将发布的政策公告预计将影响投资者信心和市场稳定性。
-entity{tuple_delimiter}3.4%跌幅{tuple_delimiter}category{tuple_delimiter}全球科技指数在午盘交易中下跌了3.4%。
-relation{tuple_delimiter}全球科技指数{tuple_delimiter}市场抛售{tuple_delimiter}市场表现, 投资者情绪{tuple_delimiter}全球科技指数的下跌是受投资者担忧驱动的更广泛市场抛售的一部分。
-relation{tuple_delimiter}Nexon Technologies{tuple_delimiter}全球科技指数{tuple_delimiter}公司影响, 指数波动{tuple_delimiter}Nexon Technologies 股价的下跌导致了全球科技指数的整体下跌。
-relation{tuple_delimiter}黄金期货{tuple_delimiter}市场抛售{tuple_delimiter}市场反应, 避险投资{tuple_delimiter}金价上涨是因为投资者在市场抛售期间寻求避险资产。
-relation{tuple_delimiter}美联储政策公告{tuple_delimiter}市场抛售{tuple_delimiter}利率影响, 金融监管{tuple_delimiter}关于美联储政策变化的猜测加剧了市场波动和投资者抛售。
+<Output>
+entity{tuple_delimiter}Global Tech Index{tuple_delimiter}category{tuple_delimiter}The Global Tech Index tracks the performance of major technology stocks and experienced a 3.4% decline today.
+entity{tuple_delimiter}Nexon Technologies{tuple_delimiter}organization{tuple_delimiter}Nexon Technologies is a tech company that saw its stock decline by 7.8% after disappointing earnings.
+entity{tuple_delimiter}Omega Energy{tuple_delimiter}organization{tuple_delimiter}Omega Energy is an energy company that gained 2.1% in stock value due to rising oil prices.
+entity{tuple_delimiter}Gold Futures{tuple_delimiter}product{tuple_delimiter}Gold futures rose by 1.5%, indicating increased investor interest in safe-haven assets.
+entity{tuple_delimiter}Crude Oil{tuple_delimiter}product{tuple_delimiter}Crude oil prices rose to $87.60 per barrel due to supply constraints and strong demand.
+entity{tuple_delimiter}Market Selloff{tuple_delimiter}category{tuple_delimiter}Market selloff refers to the significant decline in stock values due to investor concerns over interest rates and regulations.
+entity{tuple_delimiter}Federal Reserve Policy Announcement{tuple_delimiter}category{tuple_delimiter}The Federal Reserve's upcoming policy announcement is expected to impact investor confidence and market stability.
+entity{tuple_delimiter}3.4% Decline{tuple_delimiter}category{tuple_delimiter}The Global Tech Index experienced a 3.4% decline in midday trading.
+relation{tuple_delimiter}Global Tech Index{tuple_delimiter}Market Selloff{tuple_delimiter}market performance, investor sentiment{tuple_delimiter}The decline in the Global Tech Index is part of the broader market selloff driven by investor concerns.
+relation{tuple_delimiter}Nexon Technologies{tuple_delimiter}Global Tech Index{tuple_delimiter}company impact, index movement{tuple_delimiter}Nexon Technologies' stock decline contributed to the overall drop in the Global Tech Index.
+relation{tuple_delimiter}Gold Futures{tuple_delimiter}Market Selloff{tuple_delimiter}market reaction, safe-haven investment{tuple_delimiter}Gold prices rose as investors sought safe-haven assets during the market selloff.
+relation{tuple_delimiter}Federal Reserve Policy Announcement{tuple_delimiter}Market Selloff{tuple_delimiter}interest rate impact, financial regulation{tuple_delimiter}Speculation over Federal Reserve policy changes contributed to market volatility and investor selloff.
 {completion_delimiter}
 
 """,
-    """<输入文本>
+    """<Entity_types>
+["Person","Creature","Organization","Location","Event","Concept","Method","Content","Data","Artifact","NaturalObject"]
+
+<Input Text>
 ```
-在东京举行的世界田径锦标赛上，Noah Carter 使用尖端碳纤维钉鞋打破了100米短跑纪录。
+At the World Athletics Championship in Tokyo, Noah Carter broke the 100m sprint record using cutting-edge carbon-fiber spikes.
 ```
 
-<输出>
-entity{tuple_delimiter}世界田径锦标赛{tuple_delimiter}event{tuple_delimiter}世界田径锦标赛是一项全球性体育赛事，汇集了田径领域的顶尖运动员。
-entity{tuple_delimiter}东京{tuple_delimiter}location{tuple_delimiter}东京是世界田径锦标赛的举办城市。
-entity{tuple_delimiter}Noah Carter{tuple_delimiter}person{tuple_delimiter}Noah Carter 是一名短跑运动员，在世界田径锦标赛上创造了新的100米短跑纪录。
-entity{tuple_delimiter}100米短跑纪录{tuple_delimiter}category{tuple_delimiter}100米短跑纪录是田径运动的一项基准，最近被 Noah Carter 打破。
-entity{tuple_delimiter}碳纤维钉鞋{tuple_delimiter}equipment{tuple_delimiter}碳纤维钉鞋是先进的短跑鞋，提供更高的速度和抓地力。
-entity{tuple_delimiter}世界田径联合会{tuple_delimiter}organization{tuple_delimiter}世界田径联合会是管理世界田径锦标赛和纪录认证的管理机构。
-relation{tuple_delimiter}世界田径锦标赛{tuple_delimiter}东京{tuple_delimiter}赛事地点, 国际比赛{tuple_delimiter}世界田径锦标赛在东京举办。
-relation{tuple_delimiter}Noah Carter{tuple_delimiter}100米短跑纪录{tuple_delimiter}运动员成就, 破纪录{tuple_delimiter}Noah Carter 在锦标赛上创造了新的100米短跑纪录。
-relation{tuple_delimiter}Noah Carter{tuple_delimiter}碳纤维钉鞋{tuple_delimiter}运动装备, 性能提升{tuple_delimiter}Noah Carter 使用碳纤维钉鞋在比赛中提升表现。
-relation{tuple_delimiter}Noah Carter{tuple_delimiter}世界田径锦标赛{tuple_delimiter}运动员参赛, 比赛{tuple_delimiter}Noah Carter 参加了世界田径锦标赛的比赛。
+<Output>
+entity{tuple_delimiter}World Athletics Championship{tuple_delimiter}event{tuple_delimiter}The World Athletics Championship is a global sports competition featuring top athletes in track and field.
+entity{tuple_delimiter}Tokyo{tuple_delimiter}location{tuple_delimiter}Tokyo is the host city of the World Athletics Championship.
+entity{tuple_delimiter}Noah Carter{tuple_delimiter}person{tuple_delimiter}Noah Carter is a sprinter who set a new record in the 100m sprint at the World Athletics Championship.
+entity{tuple_delimiter}100m Sprint Record{tuple_delimiter}category{tuple_delimiter}The 100m sprint record is a benchmark in athletics, recently broken by Noah Carter.
+entity{tuple_delimiter}Carbon-Fiber Spikes{tuple_delimiter}equipment{tuple_delimiter}Carbon-fiber spikes are advanced sprinting shoes that provide enhanced speed and traction.
+entity{tuple_delimiter}World Athletics Federation{tuple_delimiter}organization{tuple_delimiter}The World Athletics Federation is the governing body overseeing the World Athletics Championship and record validations.
+relation{tuple_delimiter}World Athletics Championship{tuple_delimiter}Tokyo{tuple_delimiter}event location, international competition{tuple_delimiter}The World Athletics Championship is being hosted in Tokyo.
+relation{tuple_delimiter}Noah Carter{tuple_delimiter}100m Sprint Record{tuple_delimiter}athlete achievement, record-breaking{tuple_delimiter}Noah Carter set a new 100m sprint record at the championship.
+relation{tuple_delimiter}Noah Carter{tuple_delimiter}Carbon-Fiber Spikes{tuple_delimiter}athletic equipment, performance boost{tuple_delimiter}Noah Carter used carbon-fiber spikes to enhance performance during the race.
+relation{tuple_delimiter}Noah Carter{tuple_delimiter}World Athletics Championship{tuple_delimiter}athlete participation, competition{tuple_delimiter}Noah Carter is competing at the World Athletics Championship.
 {completion_delimiter}
 
 """,
 ]
 
-PROMPTS["summarize_entity_descriptions"] = """---角色---
-你是一名知识图谱专家，精通数据整理和综合。
+PROMPTS["summarize_entity_descriptions"] = """---Role---
+You are a Knowledge Graph Specialist, proficient in data curation and synthesis.
 
----任务---
-你的任务是将给定实体或关系的描述列表综合成一个单一的、全面的、连贯的摘要。
+---Task---
+Your task is to synthesize a list of descriptions of a given entity or relation into a single, comprehensive, and cohesive summary.
 
----指令---
-1. 输入格式：描述列表以 JSON 格式提供。每个 JSON 对象（代表单个描述）出现在 `描述列表` 部分的新行中。
-2. 输出格式：合并后的描述将以纯文本形式返回，以多个段落呈现，不包含任何额外的格式或摘要前后的多余评论。
-3. 全面性：摘要必须整合*每个*提供的描述中的所有关键信息。不要遗漏任何重要事实或细节。
-4. 上下文：确保摘要从客观的第三人称视角撰写；在摘要开头明确提及实体或关系的全名，以确保即时的清晰度和上下文。
-5. 上下文与客观性：
-  - 从客观的第三人称视角撰写摘要。
-  - 在摘要开头明确提及实体或关系的全名，以确保即时的清晰度和上下文。
-6. 冲突处理：
-  - 如果描述存在冲突或不一致，首先确定这些冲突是否源于共享相同名称的多个不同实体或关系。
-  - 如果识别出不同的实体/关系，请在整体输出中*分别*对每个进行摘要。
-  - 如果单个实体/关系内部存在冲突（例如，历史差异），请尝试调和它们或同时呈现两种观点并注明不确定性。
-7. 长度约束：摘要的总长度不得超过 {summary_length} 个 token，同时仍保持深度和完整性。
-8. 语言：整个输出必须使用 {language} 撰写。如果没有合适的翻译，专有名词（如人名、地名、组织名）可以保留其原始语言。
-  - 整个输出必须使用 {language} 撰写。
-  - 如果没有合适的、被广泛接受的翻译，或翻译会导致歧义，专有名词（如人名、地名、组织名）应保留其原始语言。
+---Instructions---
+1. Input Format: The description list is provided in JSON format. Each JSON object (representing a single description) appears on a new line within the `Description List` section.
+2. Output Format: The merged description will be returned as plain text, presented in multiple paragraphs, without any additional formatting or extraneous comments before or after the summary.
+3. Comprehensiveness: The summary must integrate all key information from *every* provided description. Do not omit any important facts or details.
+4. Context: Ensure the summary is written from an objective, third-person perspective; explicitly mention the name of the entity or relation for full clarity and context.
+5. Context & Objectivity:
+  - Write the summary from an objective, third-person perspective.
+  - Explicitly mention the full name of the entity or relation at the beginning of the summary to ensure immediate clarity and context.
+6. Conflict Handling:
+  - In cases of conflicting or inconsistent descriptions, first determine if these conflicts arise from multiple, distinct entities or relationships that share the same name.
+  - If distinct entities/relations are identified, summarize each one *separately* within the overall output.
+  - If conflicts within a single entity/relation (e.g., historical discrepancies) exist, attempt to reconcile them or present both viewpoints with noted uncertainty.
+7. Length Constraint:The summary's total length must not exceed {summary_length} tokens, while still maintaining depth and completeness.
+8. Language: The entire output must be written in {language}. Proper nouns (e.g., personal names, place names, organization names) may in their original language if proper translation is not available.
+  - The entire output must be written in {language}.
+  - Proper nouns (e.g., personal names, place names, organization names) should be retained in their original language if a proper, widely accepted translation is not available or would cause ambiguity.
 
----输入---
-{description_type} 名称: {description_name}
+---Input---
+{description_type} Name: {description_name}
 
-描述列表:
+Description List:
 
 ```
 {description_list}
 ```
 
----输出---
+---Output---
 """
 
 PROMPTS["fail_response"] = (
-    "抱歉，我无法为该问题提供答案。[no-context]"
+    "Sorry, I'm not able to provide an answer to that question.[no-context]"
 )
 
-PROMPTS["rag_response"] = """---角色---
+PROMPTS["rag_response"] = """---Role---
 
-你是一名专业的 AI 助手，专门从提供的知识库中综合信息。你的主要功能是*仅*使用**上下文**中提供的信息来准确回答用户查询。
+You are an expert AI assistant specializing in synthesizing information from a provided knowledge base. Your primary function is to answer user queries accurately by ONLY using the information within the provided **Context**.
 
----目标---
+---Goal---
 
-针对用户查询生成全面、结构良好的答案。
-答案必须整合**上下文**中知识图谱和文档片段的相关事实。
-如果提供了对话历史，请考虑其以保持对话流畅并避免重复信息。
+Generate a comprehensive, well-structured answer to the user query.
+The answer must integrate relevant facts from the Knowledge Graph and Document Chunks found in the **Context**.
+Consider the conversation history if provided to maintain conversational flow and avoid repeating information.
 
----指令---
+---Instructions---
 
-1. 分步说明：
-  - 结合对话历史仔细分析用户的查询意图，以充分理解用户的信息需求。
-  - 仔细审查**上下文**中的 `知识图谱数据` 和 `文档片段`。识别并提取与回答用户查询直接相关的所有信息。
-  - 将提取的事实编织成连贯且合乎逻辑的回复。你自己的知识*仅*可用于组织流畅的句子和连接思想，而不是引入任何外部信息。
-  - 跟踪直接支持回复中呈现的事实的文档片段的 reference_id。将 reference_id 与 `参考文档列表` 中的条目关联，以生成适当的引用。
-  - 在回复末尾生成一个参考文献部分。每个参考文档必须直接支持回复中呈现的事实。
-  - 参考文献部分之后不要生成任何内容。
+1. Step-by-Step Instruction:
+  - Carefully determine the user's query intent in the context of the conversation history to fully understand the user's information need.
+  - Scrutinize both `Knowledge Graph Data` and `Document Chunks` in the **Context**. Identify and extract all pieces of information that are directly relevant to answering the user query.
+  - Weave the extracted facts into a coherent and logical response. Your own knowledge must ONLY be used to formulate fluent sentences and connect ideas, NOT to introduce any external information.
+  - Track the reference_id of the document chunk which directly support the facts presented in the response. Correlate reference_id with the entries in the `Reference Document List` to generate the appropriate citations.
+  - Generate a references section at the end of the response. Each reference document must directly support the facts presented in the response.
+  - Do not generate anything after the reference section.
 
-2. 内容与基础：
-  - 严格遵守**上下文**中提供的内容；不要编造、假设或推断任何未明确说明的信息。
-  - 如果在**上下文**中找不到答案，请说明你没有足够的信息来回答。不要尝试猜测。
+2. Content & Grounding:
+  - Strictly adhere to the provided context from the **Context**; DO NOT invent, assume, or infer any information not explicitly stated.
+  - If the answer cannot be found in the **Context**, state that you do not have enough information to answer. Do not attempt to guess.
 
-3. 格式与语言：
-  - 回复必须使用与用户查询相同的语言。
-  - 回复必须使用 Markdown 格式以增强清晰度和结构（例如，标题、粗体文本、项目符号）。
-  - 回复应以 {response_type} 形式呈现。
+3. Formatting & Language:
+  - The response MUST be in the same language as the user query.
+  - The response MUST utilize Markdown formatting for enhanced clarity and structure (e.g., headings, bold text, bullet points).
+  - The response should be presented in {response_type}.
 
-4. 参考文献部分格式：
-  - 参考文献部分应位于标题下：`### 参考文献`
-  - 参考列表条目应遵循以下格式：`* [n] 文档标题`。不要在左方括号（`[`）后包含脱字符（`^`）。
-  - 引用中的文档标题必须保留其原始语言。
-  - 每个引用单独输出一行
-  - 最多提供5个最相关的引用。
-  - 不要在参考文献后生成脚注部分或任何评论、摘要或解释。
+4. References Section Format:
+  - The References section should be under heading: `### References`
+  - Reference list entries should adhere to the format: `* [n] Document Title`. Do not include a caret (`^`) after opening square bracket (`[`).
+  - The Document Title in the citation must retain its original language.
+  - Output each citation on an individual line
+  - Provide maximum of 5 most relevant citations.
+  - Do not generate footnotes section or any comment, summary, or explanation after the references.
 
-5. 参考文献部分示例：
+5. Reference Section Example:
 ```
-### 参考文献
+### References
 
-- [1] 文档标题一
-- [2] 文档标题二
-- [3] 文档标题三
+- [1] Document Title One
+- [2] Document Title Two
+- [3] Document Title Three
 ```
 
-6. 附加说明: {user_prompt}
+6. Additional Instructions: {user_prompt}
 
 
----上下文---
+---Context---
 
 {context_data}
 """
 
-PROMPTS["naive_rag_response"] = """---角色---
+PROMPTS["naive_rag_response"] = """---Role---
 
-你是一名专业的 AI 助手，专门从提供的知识库中综合信息。你的主要功能是*仅*使用**上下文**中提供的信息来准确回答用户查询。
+You are an expert AI assistant specializing in synthesizing information from a provided knowledge base. Your primary function is to answer user queries accurately by ONLY using the information within the provided **Context**.
 
----目标---
+---Goal---
 
-针对用户查询生成全面、结构良好的答案。
-答案必须整合**上下文**中文档片段的相关事实。
-如果提供了对话历史，请考虑其以保持对话流畅并避免重复信息。
+Generate a comprehensive, well-structured answer to the user query.
+The answer must integrate relevant facts from the Document Chunks found in the **Context**.
+Consider the conversation history if provided to maintain conversational flow and avoid repeating information.
 
----指令---
+---Instructions---
 
-1. 分步说明：
-  - 结合对话历史仔细分析用户的查询意图，以充分理解用户的信息需求。
-  - 仔细审查**上下文**中的 `文档片段`。识别并提取与回答用户查询直接相关的所有信息。
-  - 将提取的事实编织成连贯且合乎逻辑的回复。你自己的知识*仅*可用于组织流畅的句子和连接思想，而不是引入任何外部信息。
-  - 跟踪直接支持回复中呈现的事实的文档片段的 reference_id。将 reference_id 与 `参考文档列表` 中的条目关联，以生成适当的引用。
-  - 在回复末尾生成一个**参考文献**部分。每个参考文档必须直接支持回复中呈现的事实。
-  - 参考文献部分之后不要生成任何内容。
+1. Step-by-Step Instruction:
+  - Carefully determine the user's query intent in the context of the conversation history to fully understand the user's information need.
+  - Scrutinize `Document Chunks` in the **Context**. Identify and extract all pieces of information that are directly relevant to answering the user query.
+  - Weave the extracted facts into a coherent and logical response. Your own knowledge must ONLY be used to formulate fluent sentences and connect ideas, NOT to introduce any external information.
+  - Track the reference_id of the document chunk which directly support the facts presented in the response. Correlate reference_id with the entries in the `Reference Document List` to generate the appropriate citations.
+  - Generate a **References** section at the end of the response. Each reference document must directly support the facts presented in the response.
+  - Do not generate anything after the reference section.
 
-2. 内容与基础：
-  - 严格遵守**上下文**中提供的内容；不要编造、假设或推断任何未明确说明的信息。
-  - 如果在**上下文**中找不到答案，请说明你没有足够的信息来回答。不要尝试猜测。
+2. Content & Grounding:
+  - Strictly adhere to the provided context from the **Context**; DO NOT invent, assume, or infer any information not explicitly stated.
+  - If the answer cannot be found in the **Context**, state that you do not have enough information to answer. Do not attempt to guess.
 
-3. 格式与语言：
-  - 回复必须使用与用户查询相同的语言。
-  - 回复必须使用 Markdown 格式以增强清晰度和结构（例如，标题、粗体文本、项目符号）。
-  - 回复应以 {response_type} 形式呈现。
+3. Formatting & Language:
+  - The response MUST be in the same language as the user query.
+  - The response MUST utilize Markdown formatting for enhanced clarity and structure (e.g., headings, bold text, bullet points).
+  - The response should be presented in {response_type}.
 
-4. 参考文献部分格式：
-  - 参考文献部分应位于标题下：`### 参考文献`
-  - 参考列表条目应遵循以下格式：`* [n] 文档标题`。不要在左方括号（`[`）后包含脱字符（`^`）。
-  - 引用中的文档标题必须保留其原始语言。
-  - 每个引用单独输出一行
-  - 最多提供5个最相关的引用。
-  - 不要在参考文献后生成脚注部分或任何评论、摘要或解释。
+4. References Section Format:
+  - The References section should be under heading: `### References`
+  - Reference list entries should adhere to the format: `* [n] Document Title`. Do not include a caret (`^`) after opening square bracket (`[`).
+  - The Document Title in the citation must retain its original language.
+  - Output each citation on an individual line
+  - Provide maximum of 5 most relevant citations.
+  - Do not generate footnotes section or any comment, summary, or explanation after the references.
 
-5. 参考文献部分示例：
+5. Reference Section Example:
 ```
-### 参考文献
+### References
 
-- [1] 文档标题一
-- [2] 文档标题二
-- [3] 文档标题三
+- [1] Document Title One
+- [2] Document Title Two
+- [3] Document Title Three
 ```
 
-6. 附加说明: {user_prompt}
+6. Additional Instructions: {user_prompt}
 
 
----上下文---
+---Context---
 
 {content_data}
 """
 
 PROMPTS["kg_query_context"] = """
-知识图谱数据（实体）:
+Knowledge Graph Data (Entity):
 
 ```json
 {entities_str}
 ```
 
-知识图谱数据（关系）:
+Knowledge Graph Data (Relationship):
 
 ```json
 {relations_str}
 ```
 
-文档片段（每个条目有一个 reference_id 对应 `参考文档列表`）:
+Document Chunks (Each entry has a reference_id refer to the `Reference Document List`):
 
 ```json
 {text_chunks_str}
 ```
 
-参考文档列表（每个条目以 [reference_id] 开头，对应文档片段中的条目）:
+Reference Document List (Each entry starts with a [reference_id] that corresponds to entries in the Document Chunks):
 
 ```
 {reference_list_str}
@@ -347,13 +357,13 @@ PROMPTS["kg_query_context"] = """
 """
 
 PROMPTS["naive_query_context"] = """
-文档片段（每个条目有一个 reference_id 对应 `参考文档列表`）:
+Document Chunks (Each entry has a reference_id refer to the `Reference Document List`):
 
 ```json
 {text_chunks_str}
 ```
 
-参考文档列表（每个条目以 [reference_id] 开头，对应文档片段中的条目）:
+Reference Document List (Each entry starts with a [reference_id] that corresponds to entries in the Document Chunks):
 
 ```
 {reference_list_str}
@@ -361,60 +371,61 @@ PROMPTS["naive_query_context"] = """
 
 """
 
-PROMPTS["keywords_extraction"] = """---角色---
-你是一名专业的关键词提取专家，专门为检索增强生成（RAG）系统分析用户查询。你的目标是识别用户查询中的高层和低层关键词，这些关键词将用于有效的文档检索。
+PROMPTS["keywords_extraction"] = """---Role---
+You are an expert keyword extractor, specializing in analyzing user queries for a Retrieval-Augmented Generation (RAG) system. Your purpose is to identify both high-level and low-level keywords in the user's query that will be used for effective document retrieval.
 
----目标---
-给定一个用户查询，你的任务是提取两种不同类型的关键词：
-1. **high_level_keywords**：用于概括性概念或主题，捕获用户的核心意图、主题领域或所提问题的类型。
-2. **low_level_keywords**：用于具体实体或细节，识别具体的实体、专有名词、技术术语、产品名称或具体事物。
+---Goal---
+Given a user query, your task is to extract two distinct types of keywords:
+1. **high_level_keywords**: for overarching concepts or themes, capturing user's core intent, the subject area, or the type of question being asked.
+2. **low_level_keywords**: for specific entities or details, identifying the specific entities, proper nouns, technical jargon, product names, or concrete items.
 
----指令与约束---
-1. **输出格式**：你的输出必须是有效的 JSON 对象，不包含其他内容。不要包含任何解释性文本、markdown 代码围栏（如 ```json）或 JSON 前后的任何其他文本。它将直接被 JSON 解析器解析。
-2. **来源真实**：所有关键词必须明确来自用户查询，高层和低层关键词类别都必须包含内容。
-3. **简洁且有意义**：关键词应该是简洁的词或有意义的短语。当它们代表单一概念时，优先使用多词短语。例如，从"Apple Inc. 的最新财务报告"中，你应该提取"最新财务报告"和"Apple Inc."，而不是"最新"、"财务"、"报告"和"Apple"。
-4. **处理边缘情况**：对于过于简单、模糊或无意义的查询（例如，"你好"、"ok"、"asdfghjkl"），你必须返回一个 JSON 对象，两种关键词类型的列表都为空。
+---Instructions & Constraints---
+1. **Output Format**: Your output MUST be a valid JSON object and nothing else. Do not include any explanatory text, markdown code fences (like ```json), or any other text before or after the JSON. It will be parsed directly by a JSON parser.
+2. **Source of Truth**: All keywords must be explicitly derived from the user query, with both high-level and low-level keyword categories are required to contain content.
+3. **Concise & Meaningful**: Keywords should be concise words or meaningful phrases. Prioritize multi-word phrases when they represent a single concept. For example, from "latest financial report of Apple Inc.", you should extract "latest financial report" and "Apple Inc." rather than "latest", "financial", "report", and "Apple".
+4. **Handle Edge Cases**: For queries that are too simple, vague, or nonsensical (e.g., "hello", "ok", "asdfghjkl"), you must return a JSON object with empty lists for both keyword types.
+5. **Language**: All extracted keywords MUST be in {language}. Proper nouns (e.g., personal names, place names, organization names) should be kept in their original language.
 
----示例---
+---Examples---
 {examples}
 
----真实数据---
-用户查询: {query}
+---Real Data---
+User Query: {query}
 
----输出---
-输出:"""
+---Output---
+Output:"""
 
 PROMPTS["keywords_extraction_examples"] = [
-    """示例 1:
+    """Example 1:
 
-查询: "国际贸易如何影响全球经济稳定？"
+Query: "How does international trade influence global economic stability?"
 
-输出:
+Output:
 {
-  "high_level_keywords": ["国际贸易", "全球经济稳定", "经济影响"],
-  "low_level_keywords": ["贸易协定", "关税", "货币兑换", "进口", "出口"]
+  "high_level_keywords": ["International trade", "Global economic stability", "Economic impact"],
+  "low_level_keywords": ["Trade agreements", "Tariffs", "Currency exchange", "Imports", "Exports"]
 }
 
 """,
-    """示例 2:
+    """Example 2:
 
-查询: "森林砍伐对生物多样性有哪些环境后果？"
+Query: "What are the environmental consequences of deforestation on biodiversity?"
 
-输出:
+Output:
 {
-  "high_level_keywords": ["环境后果", "森林砍伐", "生物多样性丧失"],
-  "low_level_keywords": ["物种灭绝", "栖息地破坏", "碳排放", "热带雨林", "生态系统"]
+  "high_level_keywords": ["Environmental consequences", "Deforestation", "Biodiversity loss"],
+  "low_level_keywords": ["Species extinction", "Habitat destruction", "Carbon emissions", "Rainforest", "Ecosystem"]
 }
 
 """,
-    """示例 3:
+    """Example 3:
 
-查询: "教育在减少贫困中的作用是什么？"
+Query: "What is the role of education in reducing poverty?"
 
-输出:
+Output:
 {
-  "high_level_keywords": ["教育", "减少贫困", "社会经济发展"],
-  "low_level_keywords": ["入学机会", "识字率", "职业培训", "收入不平等"]
+  "high_level_keywords": ["Education", "Poverty reduction", "Socioeconomic development"],
+  "low_level_keywords": ["School access", "Literacy rates", "Job training", "Income inequality"]
 }
 
 """,

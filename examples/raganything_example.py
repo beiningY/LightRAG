@@ -102,7 +102,7 @@ async def process_with_rag(
         # Create RAGAnything configuration
         config = RAGAnythingConfig(
             working_dir=working_dir or "./rag_storage",
-            parse_method="auto",
+            mineru_parse_method="auto",
             enable_image_processing=True,
             enable_table_processing=True,
             enable_equation_processing=True,
